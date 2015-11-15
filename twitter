@@ -1,0 +1,77 @@
+# Synopsis: Collects word frequency data from most recent tweets in given hashtag and creates plots pdf
+import tweepy
+import time
+from nltk.corpus import stopwords
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Settings
+set_count = 1          # Number of Collections
+set_interval = 5       # Interval in minutes between data collections
+set_filter = 25        # Filters out all words that have frequencies below this threshold
+set_collect = 800      # Number of tweets collected. More than 5000 in 15 minutes may trigger Twitter's rate limit.
+hashtag = 'demdebate'  # Hashtag Analyzed
+
+# Filters out most other languages
+def is_ascii(s):
+    try:
+        s.decode('ascii')
+    except UnicodeEncodeError:
+        return False
+    else:
+        return True
+
+# List of common words to filter
+stopword = set(stopwords.words('english'))
+
+# Permissions to use Twitter's Api 
+access_token = "Insert Access Token"
+access_token_secret = "Insert Secret Access Token"
+consumer_key = "Insert Consumer Key Here"
+consumer_secret = "Insert Secret Consumer Key Here"
+auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+auth.set_access_token(access_token, access_token_secret)
+api = tweepy.API(auth)
+
+# Twitter Data Collection
+for x in range(0, set_count):     # Sets number of data collections 
+    tweets = []
+    count = set_collect          # Sets number of tweets collected each time. More than 5000 in 15 minutes will trigger Twitter's request limit.
+    public_tweets = tweepy.Cursor(api.search, q = hashtag)
+    for tweet in public_tweets.items():
+        tweets.append(tweet.text)
+        count -= 1
+        if count <= 0:
+            break
+    data = {}
+    for tweet in tweets:
+        for char in tweet:     # Filters out certain punctuation to prevent the same word from being counted twice
+            if not char.isalnum():
+                tweet = tweet.replace(char, ' ')
+        # Keeps track of all words used in tweets and their frequency
+        for word in tweet.split():
+            if word.lower() in data.keys():
+                data[word.lower()] += 1
+            elif word.lower() not in data.keys() and is_ascii(word) and 'http' not in word and word not in stopword:
+                data[word.lower()] = 1
+    # Filters out irrelevant entries
+    for key in data.keys():   
+        if data[key] < set_filter or data[key] > set_collect / 2:  
+            del data[key]
+    # Graphs the word frequency using matplotlib
+    y_pos = np.arange(-30, 5*len(data.keys())-30, 5)
+    plt.bar(y_pos, data.values(), align='center', alpha=0.5)
+    plt.xticks(y_pos, data.keys(), rotation='vertical', fontsize=6)
+    plt.xlabel('Words')
+    plt.ylabel('Frequency')
+    plt.title('Word Frequency in Chosen Hashtag')
+    plt.savefig('frequency'+str(x)+'.pdf')  # Creates a file to store the plot
+    if x == set_count - 1:
+        break
+    time.sleep(60 * set_interval)   # Sets length of time between collections
+
+
+        
+
+
+
